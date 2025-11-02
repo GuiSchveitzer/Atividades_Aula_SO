@@ -1,0 +1,9 @@
+Olá! Este é um arquivo de exemplo criado para testar o gerenciador FAT16.
+
+Este arquivo será copiado para dentro da imagem do disco FAT16.
+
+Linha 1
+Linha 2
+Linha 3
+
+Fim do arquivo de teste.

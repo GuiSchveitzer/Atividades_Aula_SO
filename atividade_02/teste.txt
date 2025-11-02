@@ -1,0 +1,8 @@
+Este é um arquivo de teste para o gerenciador FAT16.
+Ele será usado para testar a funcionalidade de inserção de arquivos.
+
+Linhas adicionais para aumentar o tamanho do arquivo:
+1234567890
+abcdefghijklmnopqrstuvwxyz
+ABCDEFGHIJKLMNOPQRSTUVWXYZ
+!@#$%^&*()_+-=[]{}|;:',.<>?/
