@@ -30,7 +30,7 @@ FAT16Manager::~FAT16Manager() {
 
 // Inicializa o gerenciador FAT16
 // Monta o sistema de arquivos, carregando as estruturas de controle na memória
-// Similar ao processo de montagem (mount) de um disco em sistemas Unix/Linux
+// Similar ao processo de montagem de um disco em sistemas Unix/Linux
 bool FAT16Manager::initialize() {
     // Abre o arquivo de imagem em modo binário (leitura e escrita)
     // Simula a abertura de um dispositivo de bloco pelo driver de disco
@@ -359,8 +359,8 @@ void FAT16Manager::showFileContent(const string& fileName) {
         }
         
         remainingBytes -= bytesToRead;
-        
-        // SO: Busca o próximo cluster na cadeia (follow the pointer)
+
+        // Busca o próximo cluster na cadeia
         cluster = fat[cluster];
     }
 
@@ -606,7 +606,7 @@ bool FAT16Manager::createFile(const string& sourcePath, const string& destName) 
     if (attrs != INVALID_FILE_ATTRIBUTES) {
         if (attrs & FILE_ATTRIBUTE_READONLY) {
             newEntry.attributes |= ATTR_READ_ONLY;  // Somente leitura
-            std::cout << "Arquivo marcado como somente leitura." << std::endl;
+            cout << "Arquivo marcado como somente leitura." << endl;
         }
         if (attrs & FILE_ATTRIBUTE_HIDDEN) {
             newEntry.attributes |= ATTR_HIDDEN;  // Oculto
@@ -622,7 +622,7 @@ bool FAT16Manager::createFile(const string& sourcePath, const string& destName) 
         // Se o arquivo não tem permissão de escrita para o dono (chmod -w)
         if (!(fileStat.st_mode & S_IWUSR)) {
             newEntry.attributes |= ATTR_READ_ONLY;
-            std::cout << "Arquivo marcado como somente leitura." << std::endl;
+            cout << "Arquivo marcado como somente leitura." << endl;
         }
     }
 #endif
