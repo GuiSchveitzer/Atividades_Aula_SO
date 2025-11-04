@@ -1,7 +1,16 @@
 #include "fat16.h"
-#include <ctime>
+#include <iostream>
+#include <iomanip>
 #include <algorithm>
-#include <cctype>
+#include <ctime>
+
+// Adicionar estes includes para detectar atributos de arquivo:
+#ifdef _WIN32
+    #include <windows.h>
+#else
+    #include <sys/stat.h>
+    #include <unistd.h>
+#endif
 
 using namespace std;
 
@@ -472,7 +481,36 @@ bool FAT16Manager::createFile(const string& sourcePath, const string& destName) 
     memset(&newEntry, 0, sizeof(DirectoryEntry));
     
     setFileName(newEntry, destName);
+    
+    // Definir atributos do arquivo
     newEntry.attributes = ATTR_ARCHIVE;
+
+    // Verificar e preservar atributos do arquivo de origem
+#ifdef _WIN32
+    DWORD attrs = GetFileAttributesA(sourcePath.c_str());
+    if (attrs != INVALID_FILE_ATTRIBUTES) {
+        if (attrs & FILE_ATTRIBUTE_READONLY) {
+            newEntry.attributes |= ATTR_READ_ONLY;
+            std::cout << "Arquivo marcado como somente leitura." << std::endl;
+        }
+        if (attrs & FILE_ATTRIBUTE_HIDDEN) {
+            newEntry.attributes |= ATTR_HIDDEN;
+        }
+        if (attrs & FILE_ATTRIBUTE_SYSTEM) {
+            newEntry.attributes |= ATTR_SYSTEM;
+        }
+    }
+#else
+    // Para sistemas Unix/Linux
+    struct stat fileStat;
+    if (stat(sourcePath.c_str(), &fileStat) == 0) {
+        // Se o arquivo não tem permissão de escrita para o dono
+        if (!(fileStat.st_mode & S_IWUSR)) {
+            newEntry.attributes |= ATTR_READ_ONLY;
+            std::cout << "Arquivo marcado como somente leitura." << std::endl;
+        }
+    }
+#endif
     
     time_t now = ::time(nullptr);
     struct tm* timeInfo = localtime(&now);
