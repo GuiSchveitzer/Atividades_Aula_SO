@@ -30,7 +30,7 @@ FAT16Manager::~FAT16Manager() {
 
 // Inicializa o gerenciador FAT16
 // Monta o sistema de arquivos, carregando as estruturas de controle na memória
-// Similar ao processo de montagem de um disco em sistemas Unix/Linux
+// Similar ao processo de montagem (mount) de um disco em sistemas Unix/Linux
 bool FAT16Manager::initialize() {
     // Abre o arquivo de imagem em modo binário (leitura e escrita)
     // Simula a abertura de um dispositivo de bloco pelo driver de disco
@@ -226,10 +226,10 @@ string FAT16Manager::formatDate(uint16_t date) {
 
 // Formata o tempo armazenado em formato FAT16 para string legível "HH:MM:SS"
 string FAT16Manager::formatTime(uint16_t time) {
-    int second = (time & 0x1F) * 2;
-    int minute = (time >> 5) & 0x3F;
-    int hour = (time >> 11) & 0x1F;
-    
+    int second = (time & 0x1F) * 2; //5bits para segundos (multiplicado por 2)
+    int minute = (time >> 5) & 0x3F; //6bits para minutos
+    int hour = (time >> 11) & 0x1F;   //5bits para horas
+
     char buffer[9];
     snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d", hour, minute, second);
     return string(buffer);
@@ -359,8 +359,8 @@ void FAT16Manager::showFileContent(const string& fileName) {
         }
         
         remainingBytes -= bytesToRead;
-
-        // Busca o próximo cluster na cadeia
+        
+        // Busca o próximo cluster na cadeia (follow the pointer)
         cluster = fat[cluster];
     }
 
@@ -606,7 +606,7 @@ bool FAT16Manager::createFile(const string& sourcePath, const string& destName) 
     if (attrs != INVALID_FILE_ATTRIBUTES) {
         if (attrs & FILE_ATTRIBUTE_READONLY) {
             newEntry.attributes |= ATTR_READ_ONLY;  // Somente leitura
-            cout << "Arquivo marcado como somente leitura." << endl;
+            std::cout << "Arquivo marcado como somente leitura." << std::endl;
         }
         if (attrs & FILE_ATTRIBUTE_HIDDEN) {
             newEntry.attributes |= ATTR_HIDDEN;  // Oculto
@@ -622,7 +622,7 @@ bool FAT16Manager::createFile(const string& sourcePath, const string& destName) 
         // Se o arquivo não tem permissão de escrita para o dono (chmod -w)
         if (!(fileStat.st_mode & S_IWUSR)) {
             newEntry.attributes |= ATTR_READ_ONLY;
-            cout << "Arquivo marcado como somente leitura." << endl;
+            std::cout << "Arquivo marcado como somente leitura." << std::endl;
         }
     }
 #endif
@@ -632,9 +632,69 @@ bool FAT16Manager::createFile(const string& sourcePath, const string& destName) 
     time_t now = ::time(nullptr);
     struct tm* timeInfo = localtime(&now);
     
-    // Formato de data FAT: bits 15-9: ano , bits 8-5: mês, bits 4-0: dia
+    // ============================================================================
+    // CODIFICAÇÃO DE DATA NO FORMATO FAT16 (16 bits compactados)
+    // ============================================================================
+    // Estrutura dos bits: [AAAAAAA MMMM DDDDD]
+    //                      ^^^^^^^ ^^^^  ^^^^^
+    //                      ano(7b) mês   dia(5b)
+    //                              (4b)
+    //
+    // Bits 15-9 (7 bits): Ano desde 1980 (0-127 = anos 1980-2107)
+    //   - tm_year retorna anos desde 1900
+    //   - Subtrai 80 para converter para anos desde 1980
+    //   - Desloca 9 bits à esquerda (<<9) para posicionar nos bits 15-9
+    //
+    // Bits 8-5 (4 bits): Mês (1-12)
+    //   - tm_mon retorna 0-11 (janeiro=0)
+    //   - Adiciona 1 para converter para 1-12
+    //   - Desloca 5 bits à esquerda (<<5) para posicionar nos bits 8-5
+    //
+    // Bits 4-0 (5 bits): Dia do mês (1-31)
+    //   - tm_mday já está no formato correto (1-31)
+    //   - Não precisa deslocar (fica nos bits 4-0)
+    //
+    // Operador | (OR): Combina os três campos em um único valor de 16 bits
+    // Exemplo: 03/11/2025
+    //   Ano:  (125-80) << 9 = 45 << 9 = 0b1011010000000000
+    //   Mês:  (10+1)   << 5 = 11 << 5 = 0b0000000101100000
+    //   Dia:  3              = 3      = 0b0000000000000011
+    //                                   ──────────────────── OR
+    //   Resultado:                      0b1011010101100011 = 46435
+    // ============================================================================
     uint16_t date = ((timeInfo->tm_year - 80) << 9) | ((timeInfo->tm_mon + 1) << 5) | timeInfo->tm_mday;
-    // Formato de hora FAT: bits 15-11: hora, bits 10-5: minuto, bits 4-0: segundo/2
+    
+    // ============================================================================
+    // CODIFICAÇÃO DE HORA NO FORMATO FAT16 (16 bits compactados)
+    // ============================================================================
+    // Estrutura dos bits: [HHHHH MMMMMM SSSSS]
+    //                      ^^^^^ ^^^^^^ ^^^^^
+    //                      hora  minuto segundo/2
+    //                      (5b)  (6b)   (5b)
+    //
+    // Bits 15-11 (5 bits): Hora (0-23)
+    //   - tm_hour já está no formato correto (0-23)
+    //   - Desloca 11 bits à esquerda (<<11) para posicionar nos bits 15-11
+    //
+    // Bits 10-5 (6 bits): Minuto (0-59)
+    //   - tm_min já está no formato correto (0-59)
+    //   - Desloca 5 bits à esquerda (<<5) para posicionar nos bits 10-5
+    //
+    // Bits 4-0 (5 bits): Segundo dividido por 2 (0-29, representa 0-58 segundos)
+    //   - FAT16 tem apenas 5 bits para segundos (32 valores possíveis)
+    //   - Mas segundos vão de 0-59 (60 valores)
+    //   - Solução: divide por 2 para ter precisão de 2 segundos
+    //   - Ao decodificar, multiplica por 2: valor_armazenado * 2
+    //   - Não precisa deslocar (fica nos bits 4-0)
+    //
+    // Operador | (OR): Combina os três campos em um único valor de 16 bits
+    // Exemplo: 20:03:16
+    //   Hora:    20 << 11 = 0b1010000000000000
+    //   Minuto:  3  << 5  = 0b0000000001100000
+    //   Segundo: 16 / 2   = 8 = 0b0000000000001000
+    //                           ──────────────────── OR
+    //   Resultado:              0b1010000001101000 = 41064
+    // ============================================================================
     uint16_t timeVal = (timeInfo->tm_hour << 11) | (timeInfo->tm_min << 5) | (timeInfo->tm_sec / 2);
     
     newEntry.creationDate = date;

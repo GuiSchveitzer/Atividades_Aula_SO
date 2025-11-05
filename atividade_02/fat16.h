@@ -9,8 +9,8 @@
 #include <iostream>
 #include <iomanip>
 
-using namespace std;
-
+// O pragma pack é usado para garantir que as estruturas sejam alinhadas byte a byte
+// Isso é crucial para ler corretamente os dados binários do sistema de arquivos FAT16
 // Estrutura do Boot Sector do FAT16
 #pragma pack(push, 1)
 struct BootSector {
@@ -73,12 +73,12 @@ struct DirectoryEntry {
 // Classe para gerenciar o sistema de arquivos FAT16
 class FAT16Manager {
 private:
-    string imageFileName;
-    fstream imageFile;
+    std::string imageFileName;
+    std::fstream imageFile;
     BootSector bootSector;
-    vector<uint16_t> fat;
-    vector<DirectoryEntry> rootDirectory;
-
+    std::vector<uint16_t> fat;
+    std::vector<DirectoryEntry> rootDirectory;
+    
     uint32_t fatStartSector;
     uint32_t rootDirStartSector;
     uint32_t dataStartSector;
@@ -91,26 +91,26 @@ private:
     void saveRootDirectory();
     
     uint32_t getClusterOffset(uint16_t cluster);
-    string getFileName(const DirectoryEntry& entry);
-    void setFileName(DirectoryEntry& entry, const string& name);
-    string formatDate(uint16_t date);
-    string formatTime(uint16_t time);
-
+    std::string getFileName(const DirectoryEntry& entry);
+    void setFileName(DirectoryEntry& entry, const std::string& name);
+    std::string formatDate(uint16_t date);
+    std::string formatTime(uint16_t time);
+    
     uint16_t findFreeCluster();
-    DirectoryEntry* findFileEntry(const string& fileName);
+    DirectoryEntry* findFileEntry(const std::string& fileName);
     int findFreeDirectoryEntry();
     
 public:
-    FAT16Manager(const string& imagePath);
+    FAT16Manager(const std::string& imagePath);
     ~FAT16Manager();
     
     bool initialize();
     void listFiles();
-    void showFileContent(const string& fileName);
-    void showFileAttributes(const string& fileName);
-    bool renameFile(const string& oldName, const string& newName);
-    bool deleteFile(const string& fileName);
-    bool createFile(const string& sourcePath, const string& destName);
+    void showFileContent(const std::string& fileName);
+    void showFileAttributes(const std::string& fileName);
+    bool renameFile(const std::string& oldName, const std::string& newName);
+    bool deleteFile(const std::string& fileName);
+    bool createFile(const std::string& sourcePath, const std::string& destName);
 };
 
 #endif // FAT16_H
